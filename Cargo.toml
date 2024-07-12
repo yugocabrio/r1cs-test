@@ -1,0 +1,49 @@
+[package]
+name = "r1cs_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nexus-nova = { git = "https://github.com/hamidra/nexus-zkvm.git", default-features=false, features=["spartan"], version = "0.1.0" }
+ark-spartan = { git = "https://github.com/hamidra/nexus-zkvm.git", package="ark-spartan" }
+ark-circom = { git = "https://github.com/yugocabrio/circom-compat.git", rev = "b021c4c" }
+
+ark-crypto-primitives = "0.4.0"
+ark-ff= "0.4.0"
+ark-r1cs-std = "0.4.0"
+ark-relations = "0.4.0"
+tracing-subscriber = "0.3.18"
+tracing = "0.1.40"
+ark-vesta = { git = "https://github.com/arkworks-rs/algebra.git", version = "0.4.0" }
+ark-pallas = { git = "https://github.com/arkworks-rs/algebra.git", version = "0.4.0" }
+ark-grumpkin = { git = "https://github.com/arkworks-rs/algebra.git", version = "0.4.0" }
+ark-bn254 = { version = "=0.4.0" }
+
+ark-bls12-381 = { git = "https://github.com/arkworks-rs/algebra.git", version = "0.4.0" }
+ark-ec = { version = "0.4.2", default-features = false }
+ark-std = "0.4.0"
+ark-serialize = { version = "0.4.0", features = ["derive"] }
+num-bigint = "0.4.3"
+serde = {version="1.0.197", features=["derive"]}
+serde_json = "1.0.115"
+hex = {version="0.4.3", features=["serde"]}
+thiserror = "1.0.58"
+color-eyre = "=0.6.2"
+byteorder = "=1.4.3"
+
+[patch.crates-io]
+ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", rev = "d27a5c8" }
+
+ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std/", rev = "2ca3bd7" }
+
+ark-ff = { git = "https://github.com/arkworks-rs/algebra/", rev = "2a80c54" }
+ark-ec = { git = "https://github.com/arkworks-rs/algebra/", rev = "2a80c54" }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra/", rev = "2a80c54" }
+ark-poly = { git = "https://github.com/arkworks-rs/algebra/", rev = "2a80c54" }
+
+ark-poly-commit = { git = "https://github.com/arkworks-rs/poly-commit/", rev = "12f5529" }
+
+# note bls is using a different commit from the other curves
+ark-bls12-381 = { git = "https://github.com/arkworks-rs/curves/", rev = "3fded1f" }
+
+ark-bn254 = { git = "https://github.com/arkworks-rs/curves/", rev = "8c0256a" }
