@@ -1,3 +1,5 @@
+// Make coprocessors circuit from Circom
+
 use std::{error::Error, fs::File, io::BufReader, marker::PhantomData, path::PathBuf};
 use ark_ec::CurveGroup;
 use num_bigint::BigInt;
@@ -8,16 +10,11 @@ use ark_ff::PrimeField;
 use nexus_nova::r1cs::R1CSShape;
 use nexus_nova::ccs::SparseMatrix;
 
-// Define the sparse matrices on PrimeFiled.
 pub type Constraints<G> = (ConstraintVec<G>, ConstraintVec<G>, ConstraintVec<G>);
 pub type ConstraintVec<G> = Vec<(usize, G)>;
 
-
 type ExtractedConstraints<G> = (Vec<Constraints<G>>, usize, usize);
-
-
 pub type ExtractedConstraintsResult<F> = Result<ExtractedConstraints<F>, Box<dyn Error>>;
-pub type R1CSShapeandZ<G> = (R1CSShape<G>, Vec<G>);
 
 pub struct CircomWrapper<G: CurveGroup> {
     r1cs_filepath: PathBuf,
@@ -35,27 +32,16 @@ impl<G: CurveGroup> CircomWrapper<G> {
         }
     }
 
-    // Aggregates multiple functions to obtain R1CS and Z as defined in folding-schemes from Circom.
+    // TODO: Split into witness and instance, not entire Z
+    // Aggregates multiple functions to obtain R1CS and Z as defined in nexus from Circom.
     pub fn extract_r1cs_and_z(
         &self,
         inputs: &[(String, Vec<BigInt>)],
     ) -> Result<(R1CSShape<G>, Vec<G::ScalarField>), Box<dyn Error>> {
         let (constraints, pub_io_len, num_variables) = self.extract_constraints_from_r1cs()?;
         let witness = self.calculate_witness(inputs)?;
-        let r1cs_shape = self.convert_to_folding_schemes_r1cs(constraints, pub_io_len, num_variables);
-        Ok((r1cs_shape, witness))
-    }
-
-    /*
-    pub fn extract_r1cs_and_z(
-        &self,
-        inputs: &[(String, Vec<BigInt>)],
-    ) -> Result<R1CSShape<G::CurveGroup>, Box<dyn Error>> {
-        let (constraints, pub_io_len, num_variables) = self.extract_constraints_from_r1cs()?;
-        let witness = self.calculate_witness(inputs)?;
         self.circom_to_folding_schemes_r1cs_and_z(constraints, &witness, pub_io_len, num_variables)
     }
-    */
 
     // Extracts constraints from the r1cs file.
     pub fn extract_constraints_from_r1cs(&self) -> ExtractedConstraintsResult<G::ScalarField> {
@@ -71,14 +57,13 @@ impl<G: CurveGroup> CircomWrapper<G> {
         Ok((constraints, pub_io_len, num_variables))
     }
     
-    // Converts a set of constraints from ark-circom into R1CS format of folding-schemes.
-    fn convert_to_folding_schemes_r1cs(
+    // Converts a set of constraints from ark-circom into R1CS format of nexus.
+    pub fn convert_to_folding_schemes_r1cs(
         &self,
         constraints: Vec<Constraints<G::ScalarField>>,
         pub_io_len: usize,
         num_variables: usize,
     ) -> R1CSShape<G> {
-        // Initialize vectors to collect all entries for A, B, C
         let mut a_data = Vec::new();
         let mut b_data = Vec::new();
         let mut c_data = Vec::new();
@@ -90,13 +75,14 @@ impl<G: CurveGroup> CircomWrapper<G> {
             c_data.extend(c_vec.iter().map(|&(index, coeff)| (coeff, index)));
         }
 
-        // Create single SparseMatrix for A, B, C
+        // Create SparseMatrix for A, B, C
         let a_matrix = SparseMatrix::new(&[a_data], constraints.len(), num_variables);
         let b_matrix = SparseMatrix::new(&[b_data], constraints.len(), num_variables);
         let c_matrix = SparseMatrix::new(&[c_data], constraints.len(), num_variables);
 
         R1CSShape {
             num_constraints: constraints.len(),
+            // TODO: check
             num_vars: num_variables - pub_io_len,
             num_io: pub_io_len,
             A: a_matrix,
@@ -105,29 +91,13 @@ impl<G: CurveGroup> CircomWrapper<G> {
         }
     }
     
-    // Helper function to convert a constraint vector into a sparse matrix
-    fn convert_constraint_to_sparse_matrix(
-        constraint_vec: &ConstraintVec<G::ScalarField>,
-        num_constraints: usize,
-        num_variables: usize,
-
-    ) -> SparseMatrix<G::ScalarField> {
-        let matrix_data: Vec<Vec<(G::ScalarField, usize)>> = constraint_vec.iter()
-            .map(|&(index, coeff)| vec![(coeff, index)]) // 各エントリを個別のVecにする
-            .collect();
-
-        // matrix_dataはVec<Vec<_>>なので、スライスとして渡す
-        SparseMatrix::new(matrix_data.as_slice(), num_constraints, num_variables)
-    }
-
-    // Calculates the witness given the Wasm filepath and inputs.
-    pub fn calculate_witness(&self, inputs: &[(String, Vec<BigInt>)]) -> Result<Vec<BigInt>> {
+    pub fn calculate_witness(&self, inputs: &[(String, Vec<BigInt>)]) -> Result<Vec<BigInt>, Box<dyn Error>> {
         let mut calculator = WitnessCalculator::new(&self.wasm_filepath)?;
-        calculator.calculate_witness(inputs.iter().cloned(), true)
+        Ok(calculator.calculate_witness(inputs.iter().cloned(), true)?)
     }
 
     // Converts a num_bigint input to `PrimeField`'s BigInt.
-    pub fn num_bigint_to_ark_bigint<G: PrimeField>(
+    pub fn num_bigint_to_ark_bigint<F: PrimeField>(
         &self,
         value: &BigInt,
     ) -> Result<F::BigInt, Box<dyn Error>> {
@@ -137,33 +107,75 @@ impl<G: CurveGroup> CircomWrapper<G> {
         F::BigInt::try_from(big_uint).map_err(|_| "BigInt conversion failed".to_string().into())
     }
 
-    // Converts R1CS constraints and witness from ark-circom format
-    // into folding-schemes R1CS and z format.
-    pub fn circom_to_folding_schemes_r1cs_and_z<F>(
+    // Converts R1CS constraints and witness from ark-circom format into nexus R1CS and z format.
+    pub fn circom_to_folding_schemes_r1cs_and_z(
         &self,
-        constraints: Vec<Constraints<F>>,
+        constraints: Vec<Constraints<G::ScalarField>>,
         witness: &[BigInt],
         pub_io_len: usize,
         num_variables: usize,
-    ) -> Result<(R1CSShape<G>, Vec<F>), Box<dyn Error>>
-    where
-        F: PrimeField,
-    {
-        let folding_schemes_r1cs =
-            self.convert_to_folding_schemes_r1cs(constraints, pub_io_len, num_variables);
+    ) -> Result<(R1CSShape<G>, Vec<G::ScalarField>), Box<dyn Error>> {
+        let folding_schemes_r1cs = self.convert_to_folding_schemes_r1cs(constraints, pub_io_len, num_variables);
 
-        let z: Result<Vec<F>, _> = witness
+        let z: Result<Vec<G::ScalarField>, _> = witness
             .iter()
             .map(|big_int| {
-                let ark_big_int = self.num_bigint_to_ark_bigint::<F>(big_int)?;
-                F::from_bigint(ark_big_int).ok_or_else(|| {
-                    "Failed to convert bigint to field element"
-                        .to_string()
-                        .into()
+                let ark_big_int = self.num_bigint_to_ark_bigint::<G::ScalarField>(big_int)?;
+                G::ScalarField::from_bigint(ark_big_int).ok_or_else(|| {
+                    "Failed to convert bigint to field element".to_string().into()
                 })
             })
             .collect();
 
         z.map(|z| (folding_schemes_r1cs, z))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::CircomWrapper;
+    use num_bigint::BigInt;
+    use std::env;   
+    use ark_test_curves::bls12_381::{G1Projective as G};
+
+    fn test_circom_conversion_logic(expect_success: bool, inputs: Vec<(String, Vec<BigInt>)>) {
+        let current_dir = env::current_dir().unwrap();
+        
+        // TODO: Change path
+        let base_path = current_dir.join("src/frontend/circom/test_folder");
+
+        let r1cs_filepath = base_path.join("test_circuit.r1cs");
+        let wasm_filepath = base_path.join("test_circuit_js/test_circuit.wasm");
+
+        assert!(r1cs_filepath.exists());
+        assert!(wasm_filepath.exists());
+
+        let circom_wrapper = CircomWrapper::<G>::new(r1cs_filepath, wasm_filepath);
+
+        let (r1cs, z) = circom_wrapper
+            .extract_r1cs_and_z(&inputs)
+            .expect("Error processing input");
+
+        // TODO: Change is_satisfied function of nexus
+        // Checks the relationship of R1CS.
+        let check_result = std::panic::catch_unwind(|| {
+            // r1cs.check_relation(&z).unwrap();
+        });
+
+        match (expect_success, check_result) {
+            (true, Ok(_)) => {}
+            (false, Err(_)) => {}
+            (true, Err(_)) => panic!("Expected success but got a failure."),
+            (false, Ok(_)) => panic!("Expected a failure but got success."),
+        }
+    }
+
+    #[test]
+    fn test_circom_conversion() {
+        // expect it to pass for correct inputs.
+        test_circom_conversion_logic(true, vec![("step_in".to_string(), vec![BigInt::from(3)])]);
+
+        // expect it to fail for incorrect inputs.
+        test_circom_conversion_logic(false, vec![("step_in".to_string(), vec![BigInt::from(7)])]);
     }
 }

@@ -353,6 +353,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-test-curves"
+version = "0.4.2"
+source = "git+https://github.com/arkworks-rs/algebra/?rev=2a80c54#2a80c54687582f49cbbe9a27b94071e1a500f056"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
 name = "ark-vesta"
 version = "0.4.0"
 source = "git+https://github.com/arkworks-rs/algebra.git#5a781ae69c373e46c8d738d147a764a8ee510865"
@@ -1659,6 +1669,7 @@ dependencies = [
  "ark-serialize",
  "ark-spartan",
  "ark-std",
+ "ark-test-curves",
  "ark-vesta",
  "byteorder",
  "color-eyre",

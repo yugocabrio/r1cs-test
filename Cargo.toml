@@ -30,6 +30,7 @@ hex = {version="0.4.3", features=["serde"]}
 thiserror = "1.0.58"
 color-eyre = "=0.6.2"
 byteorder = "=1.4.3"
+ark-test-curves = { version = "0.4.2", features = ["bls12_381_curve"] }
 
 [patch.crates-io]
 ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", rev = "d27a5c8" }
@@ -47,3 +48,4 @@ ark-poly-commit = { git = "https://github.com/arkworks-rs/poly-commit/", rev = "
 ark-bls12-381 = { git = "https://github.com/arkworks-rs/curves/", rev = "3fded1f" }
 
 ark-bn254 = { git = "https://github.com/arkworks-rs/curves/", rev = "8c0256a" }
+ark-test-curves = { git = "https://github.com/arkworks-rs/algebra/", rev = "2a80c54" }
